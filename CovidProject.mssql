@@ -1,0 +1,161 @@
+/* I had hard time importing the csv files to PGAdmin. This is the steps I did for both tables:
+	1. I created a table and entered the columns' names manually and the data type for each column.
+	2. I used this query on PSQL Tools:ABORT
+		\COPY "CovidDeaths"
+		FROM '/Users/amalalsafadi/Desktop/CovidDeaths.csv' 
+		DELIMITER ',' CSV HEADER;
+	3. I got some errors because of mistakes in data type so I fixed it.
+	4. when I used VARCHAR or CHAR for the string columnsm, it truncuated the string and saved only the first letter
+	   so I had to change the data type to text.I had to delet all the rows in the tables and apply the above copy 
+	   query again.
+*/
+
+/* Here We will find information about the tables */
+
+SELECT count(*) as death_row_no From "CovidDeaths";
+
+SELECT COUNT(*) as death_column_no
+  FROM INFORMATION_SCHEMA.COLUMNS
+ WHERE table_catalog = 'Covid_Project' 
+   AND table_name = 'CovidDeaths';
+/* we have 85171 rows and 59 columns in Covid Death Table */
+
+SELECT count(*) as death_row_no From "CovidVaccinations";
+
+SELECT COUNT(*) as death_column_no
+  FROM INFORMATION_SCHEMA.COLUMNS
+ WHERE table_catalog = 'Covid_Project' 
+   AND table_name = 'CovidVaccinations';
+/* we have 85171 rows and 37 columns in Covid Vaccinations Table */
+
+SELECT location, date, total_cases, new_cases, total_deaths, population
+FROM "CovidDeaths"
+where continent is not null
+order by 1,2
+
+/* Looking at Total cases vs total deaths */
+-- show the liklihood of dying if you get covid in your country
+SELECT location, date, total_cases, total_deaths, (total_deaths/total_cases)*100.00 as DeathPercentage
+FROM "CovidDeaths" WHERE location like 'Canada'
+order by 1,2
+
+-- Looking at the total cases vs population
+-- show the percentage of population who got covid
+SELECT location, date, population, total_cases,(total_cases/population)*100.00 as InfectionPercentage
+FROM "CovidDeaths" WHERE location like 'Canada' and where continent is not null
+order by 1,2
+
+-- which country has the highest infection rate compared to population
+SELECT location, population, max(total_cases) as highestInfectionCount, max((total_cases/population))*100.00 as HighestInfectionPercentage
+FROM "CovidDeaths" 
+where continent is not null
+group by location, population
+order by HighestInfectionPercentage DESC
+
+-- Let's do this by continent
+SELECT continent, max(cast(total_deaths as int)) as highestInfectionCount
+FROM "CovidDeaths" 
+where continent is not null
+group by continent
+order by highestInfectionCount DESC
+
+SELECT location, max(cast(total_deaths as int)) as highestInfectionCount
+FROM "CovidDeaths" 
+where continent is null
+group by location
+order by highestInfectionCount DESC
+
+-- This is showing countries with hieghest death count per population
+SELECT location, max(cast(total_deaths as int)) as highestInfectionCount
+FROM "CovidDeaths" 
+where continent is not null
+group by location
+order by highestInfectionCount DESC
+
+-- showing the continents that have highest death per population
+-- Let's do this by continent
+SELECT continent, max(cast(total_deaths as int)) as TotalDeathCount
+FROM "CovidDeaths" 
+where continent is not null
+group by continent
+order by TotalDeathCount DESC
+
+-- Global Numbers
+SELECT date, sum(new_cases) as total_cases, sum(cast(new_deaths as int)) as total_death,sum(cast(new_deaths as int))/sum(new_cases)*100 as DeathPercentage
+FROM "CovidDeaths" 
+where continent is not null
+group by date
+order by 1,2
+
+-- join death and vaccination tables
+select * from "CovidDeaths" dea
+Join "CovidVaccinations" vac
+ON dea.location = vac.location
+and dea.date = vac.date
+
+-- Looking at Total population vs Vacinations
+
+select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations 
+, sum(cast(vac.new_vaccinations as int)) OVER (Partition by dea.location order by dea.location, dea.date) 
+as RollingPeopleVaccinated
+from "CovidDeaths" dea
+Join "CovidVaccinations" vac
+ON dea.location = vac.location
+and dea.date = vac.date
+where dea.continent is not null
+order by 2,3
+
+-- use CTE
+with PopvsVac --(continent, location, date, population, new_vaccinations, RollingPeopleVaccinated)
+as 
+(
+select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations 
+, sum(vac.new_vaccinations) OVER (Partition by dea.location order by dea.location, dea.date) 
+as RollingPeopleVaccinated
+from "CovidDeaths" dea
+Join "CovidVaccinations" vac
+ON dea.location = vac.location
+and dea.date = vac.date
+where dea.continent is not null
+--order by 2,3
+	)
+	select * , (RollingPeopleVaccinated/population)*100
+				From PopvsVac
+
+
+-- use TEMP Table
+DROP Table If exists PercentagePopulationVaccinated;
+create TEMP table PercentagePopulationVaccinated
+/*(
+continent varchar(255),
+location varchar(255),
+date date,
+population numeric,
+new_vaccination numeric
+)*/
+--  no need to define columns and data type as in cte
+
+AS
+select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations 
+, sum(vac.new_vaccinations) OVER (Partition by dea.location order by dea.location, dea.date) 
+as RollingPeopleVaccinated
+from "CovidDeaths" dea
+Join "CovidVaccinations" vac
+ON dea.location = vac.location
+and dea.date = vac.date
+where dea.continent is not null;
+	
+select * , (RollingPeopleVaccinated/population)*100
+From PercentagePopulationVaccinated;
+
+-- creating view to store data later
+create view PercentagePopulationVaccinated AS
+select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations 
+, sum(cast(vac.new_vaccinations as int)) OVER (Partition by dea.location order by dea.location, dea.date) 
+as RollingPeopleVaccinated
+from "CovidDeaths" dea
+Join "CovidVaccinations" vac
+ON dea.location = vac.location
+and dea.date = vac.date
+where dea.continent is not null
+
