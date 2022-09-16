@@ -1,4 +1,8 @@
-/* I had hard time importing the csv files to PGAdmin. This is the steps I did for both tables:
+/* 
+Covid 19 Death and Vaccinations Analysis 
+*/
+
+/*  This is the steps I did to For import the csv files to PGAdminfor:
 	1. I created a table and entered the columns' names manually and the data type for each column.
 	2. I used this query on PSQL Tools:ABORT
 		\COPY "CovidDeaths"
@@ -159,3 +163,6 @@ ON dea.location = vac.location
 and dea.date = vac.date
 where dea.continent is not null
 
+
+-----------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------
