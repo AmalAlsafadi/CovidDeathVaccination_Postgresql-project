@@ -5,6 +5,7 @@ In this project I applied EDA on the datset. I used Postgresql PGADMIN4
 The questions that were invistigated are:
                                        
 	1. What is the liklihood of dying if you get covid?
+	
         2. What is the percentage of population who got covid?
 	
 	3. Which countries has the highest infection rate per population?
